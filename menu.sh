@@ -53,7 +53,7 @@ menu() {
   echo -e "  ${CYAN}[4]${NC}  Test           — jalanin 92 test cases"
   echo -e "  ${CYAN}[5]${NC}  Edit .env      — isi/ganti API key"
   echo -e "  ${CYAN}[6]${NC}  Encrypt Keys   — enkripsi API key"
-  echo -e "  ${CYAN}[7]${NC}  Logs           — liat file log"
+  echo -e "  ${CYAN}[7]${NC}  Logs & System  — log aktivitas, resource, status"
   echo -e "  ${CYAN}[8]${NC}  Keluar"
   echo ""
 }
@@ -94,7 +94,7 @@ pilih_timeframe() {
 
 while true; do
   menu
-  read -p "  Masukin nomor [1-8]: " choice
+  read -p "  Masukin nomor [1-7]: " choice
 
   case "$choice" in
     1)
@@ -214,14 +214,109 @@ while true; do
       ;;
 
     7)
-      echo ""
-      if [ -f "logs/bot.log" ]; then
-        tail -50 logs/bot.log
-      else
-        echo -e "  ${YELLOW}Belum ada log${NC}"
-      fi
-      echo ""
-      read -p "  Tekan Enter..."
+      while true; do
+        echo ""
+        echo -e "${BOLD}═══ LOGS & SYSTEM ═══${NC}"
+        echo ""
+        echo -e "  ${CYAN}[1]${NC}  Bot Activity   — 50 baris terakhir log bot"
+        echo -e "  ${CYAN}[2]${NC}  System Resource — CPU, RAM, disk, uptime"
+        echo -e "  ${CYAN}[3]${NC}  Bot Status     — cek screen/tmux session"
+        echo -e "  ${CYAN}[4]${NC}  Network Check  — ping ke Indodax & GitHub"
+        echo -e "  ${CYAN}[5]${NC}  All in One     — tampilin semua sekaligus"
+        echo -e "  ${CYAN}[0]${NC}  Kembali ke menu utama"
+        echo ""
+        read -p "  Pilihan [0]: " log_choice
+        echo ""
+        case "${log_choice:-0}" in
+          1)
+            if [ -f "logs/bot.log" ]; then
+              tail -50 logs/bot.log
+            else
+              echo -e "  ${YELLOW}Belum ada log bot${NC}"
+            fi
+            ;;
+          2)
+            echo -e "  ${BOLD}CPU & RAM:${NC}"
+            echo -e "    $(ps -eo pid,comm,%cpu,%mem,rss --sort=-%cpu | head -8)"
+            echo ""
+            echo -e "  ${BOLD}Disk:${NC}"
+            df -h "$HOME" | awk 'NR==1 || /dev/'
+            echo ""
+            echo -e "  ${BOLD}Uptime:${NC}"
+            uptime
+            echo ""
+            echo -e "  ${BOLD}Termux Wake Lock:${NC}"
+            if command -v termux-wake-lock &>/dev/null; then
+              termux-wake-lock 2>/dev/null && echo -e "    ${GREEN}Aktif${NC}" || echo -e "    ${YELLOW}Tidak aktif${NC}"
+            else
+              echo -e "    ${YELLOW}termux-api ga terinstall${NC}"
+            fi
+            ;;
+          3)
+            echo -e "  ${BOLD}Screen sessions:${NC}"
+            screen -ls 2>/dev/null || echo "    (ga ada screen session)"
+            echo ""
+            echo -e "  ${BOLD}Tmux sessions:${NC}"
+            tmux list-sessions 2>/dev/null || echo "    (ga ada tmux session)"
+            echo ""
+            echo -e "  ${BOLD}Bot PID (kalo jalan langsung):${NC}"
+            pid=$(pgrep -f "python.*main.py" 2>/dev/null || true)
+            if [ -n "$pid" ]; then
+              echo -e "    ${GREEN}PID: $pid${NC}"
+              ps -p "$pid" -o etime= 2>/dev/null | xargs echo "    Udah jalan:"
+            else
+              echo -e "    ${YELLOW}Bot ga jalan${NC}"
+            fi
+            ;;
+          4)
+            echo -e "  ${BOLD}Indodax:${NC}"
+            if ping -c 1 -W 3 indodax.com &>/dev/null; then
+              echo -e "    ${GREEN}✓${NC} indodax.com reachable"
+            else
+              echo -e "    ${RED}✗${NC} indodax.com ga nyampe!"
+            fi
+            echo -e "  ${BOLD}GitHub:${NC}"
+            if ping -c 1 -W 3 github.com &>/dev/null; then
+              echo -e "    ${GREEN}✓${NC} github.com reachable"
+            else
+              echo -e "    ${RED}✗${NC} github.com ga nyampe!"
+            fi
+            echo -e "  ${BOLD}IP Public:${NC}"
+            ip=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || echo "timeout")
+            echo -e "    $ip"
+            ;;
+          5)
+            echo -e "${BOLD}--- Bot Activity ---${NC}"
+            if [ -f "logs/bot.log" ]; then
+              tail -20 logs/bot.log
+            else
+              echo "  (belum ada log)"
+            fi
+            echo ""
+            echo -e "${BOLD}--- CPU & RAM (top 5) ---${NC}"
+            ps -eo pid,comm,%cpu,%mem,rss --sort=-%cpu | head -6
+            echo ""
+            echo -e "${BOLD}--- Disk ---${NC}"
+            df -h "$HOME" | awk 'NR==1 || /dev/'
+            echo ""
+            echo -e "${BOLD}--- Bot Process ---${NC}"
+            pid=$(pgrep -f "python.*main.py" 2>/dev/null || true)
+            if [ -n "$pid" ]; then
+              echo -e "  ${GREEN}Running (PID: $pid)${NC}"
+            else
+              echo -e "  ${YELLOW}Not running${NC}"
+            fi
+            echo ""
+            echo -e "${BOLD}--- Network ---${NC}"
+            ping -c 1 -W 2 indodax.com &>/dev/null && echo -e "  ${GREEN}✓ indodax.com${NC}" || echo -e "  ${RED}✗ indodax.com${NC}"
+            ping -c 1 -W 2 github.com &>/dev/null && echo -e "  ${GREEN}✓ github.com${NC}" || echo -e "  ${RED}✗ github.com${NC}"
+            ;;
+          0) break ;;
+          *) echo -e "  ${RED}Pilihan ga valid${NC}" ;;
+        esac
+        echo ""
+        read -p "  Tekan Enter..."
+      done
       ;;
 
     8)
