@@ -6,6 +6,8 @@ __pycache__/
 .env
 storage/*.db
 storage/*.sqlite
+storage/*.json
+!storage/__init__.py
 .key
 *.key
 config.json
