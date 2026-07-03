@@ -46,6 +46,7 @@ from core.adaptive_engine import AdaptiveEngine
 from core.risk_manager import RiskManager, RiskCheckResult, PositionSizeResult
 from core.exit_manager import ExitManager, ExitSignal
 from core.logger import Logger
+from services.notifier import TelegramNotifier
 
 # Import models
 from dataclasses import dataclass
@@ -454,6 +455,10 @@ class Bot:
         self.risk_manager = RiskManager(config, self.trade_store)
         self.exit_manager = ExitManager(config, self.trade_store)
         self.logger = Logger(config)
+        self.notifier = TelegramNotifier(
+            bot_token=config.get("TELEGRAM_BOT_TOKEN"),
+            chat_id=config.get("TELEGRAM_CHAT_ID")
+        )
         
         # Update config
         self.config.update({
@@ -529,6 +534,10 @@ class Bot:
                             signal, self.exchange, self.risk_manager
                         )
                         self.logger.print_exit(exit_result)
+                        self.notifier.send_trade(
+                            pair, signal.action, signal.price, 0,
+                            pnl=exit_result.get("pnl"), reason=signal.reason
+                        )
                         self.logger.log_to_file(
                             f"EXIT: {pair} | {signal.action} | {signal.reason}",
                             level="INFO"
@@ -714,6 +723,7 @@ class Bot:
             "phantom_penalty": phantom_penalty * 100,
             "id": trade_id
         })
+        self.notifier.send_trade(pair, signal, current_price, size_result.size)
         
         # Execute trade (in paper or live mode)
         if self.config.get("mode") in ["paper", "live"]:
@@ -742,18 +752,26 @@ class Bot:
         try:
             self.initialize()
             
+            self.notifier.send_startup(
+                self.config.get("mode", "paper"),
+                self.config.get("pairs", []),
+                self.config.get("paper_balance", 0)
+            )
+            
+            bot_start = time.time()
             while self.running:
-                start_time = time.time()
+                cycle_start = time.time()
                 
                 try:
                     self.cycle()
                 except Exception as e:
                     print(f"\n❌ Cycle error: {e}")
+                    self.notifier.send_alert(f"Cycle error: {e}")
                     import traceback
                     traceback.print_exc()
                 
                 # Calculate sleep time
-                elapsed = time.time() - start_time
+                elapsed = time.time() - cycle_start
                 sleep_time = max(0, (interval_minutes * 60) - elapsed)
                 print(f"\n⏳ Next cycle in {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
@@ -761,6 +779,11 @@ class Bot:
         except KeyboardInterrupt:
             print("\n🛑 Bot stopped by user")
             self.logger.print_summary()
+            total_trades = getattr(self.logger, 'winning_trades', 0) + getattr(self.logger, 'losing_trades', 0)
+            total_pnl = getattr(self.logger, 'total_pnl', 0)
+            uptime_sec = int(time.time() - bot_start)
+            uptime_str = f"{uptime_sec//3600}h {(uptime_sec%3600)//60}m"
+            self.notifier.send_shutdown(total_trades, total_pnl, uptime_str)
             self.running = False
         except Exception as e:
             print(f"\n❌ Fatal error: {e}")
@@ -834,15 +857,8 @@ def main():
     """Main entry point"""
     args = parse_args()
     
-    # Load default config
-    config = {
-        "pairs": [p.strip() for p in args.pairs.split(",")],
-        "timeframe": args.timeframe,
-        "mode": args.command,
-        "initial_balance": args.balance if hasattr(args, "balance") else 10_000_000,
-    }
-    
-    # Load from config.json if exists
+    # Load from config.json if exists (baseline)
+    config = {}
     if os.path.exists("config.json"):
         try:
             with open("config.json", "r") as f:
@@ -850,6 +866,13 @@ def main():
             config.update(file_config)
         except Exception as e:
             print(f"Warning: Could not load config.json: {e}")
+    
+    # CLI args override config.json
+    config["pairs"] = [p.strip() for p in args.pairs.split(",")]
+    config["timeframe"] = args.timeframe
+    config["mode"] = args.command
+    if hasattr(args, "balance"):
+        config["initial_balance"] = args.balance
     
     # Load environment variables
     if os.path.exists(".env"):
@@ -868,6 +891,16 @@ def main():
                 config["INDODAX_SECRET_KEY"] = manager.decrypt(os.getenv("INDODAX_SECRET_KEY_ENC"))
             except Exception as e:
                 print(f"Warning: Could not decrypt API keys: {e}")
+
+        # Decrypt Telegram token
+        if os.getenv("TELEGRAM_BOT_TOKEN_ENC"):
+            try:
+                enc_key = os.getenv("ENCRYPTION_KEY")
+                manager = SecretManager(encryption_key=enc_key) if enc_key else SecretManager()
+                config["TELEGRAM_BOT_TOKEN"] = manager.decrypt(os.getenv("TELEGRAM_BOT_TOKEN_ENC"))
+                config["TELEGRAM_CHAT_ID"] = os.getenv("TELEGRAM_CHAT_ID", "")
+            except Exception as e:
+                print(f"Warning: Could not decrypt Telegram token: {e}")
     
     # Handle backtest mode
     if args.command == "backtest":
