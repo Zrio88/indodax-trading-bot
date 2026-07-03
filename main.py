@@ -223,10 +223,12 @@ class Indicators:
         # Volume Score
         if indicators.volume_ratio > 2.0:
             scores["volume_spike"] = 100
-        elif indicators.volume_ratio > 1.0:
+        elif indicators.volume_ratio > 1.5:
             scores["volume_spike"] = 75
+        elif indicators.volume_ratio > 1.0:
+            scores["volume_spike"] = 50
         else:
-            scores["volume_spike"] = 25
+            scores["volume_spike"] = 0
         
         # ADX Score
         if indicators.adx > 25:
@@ -256,16 +258,52 @@ class Indicators:
         ) / total_weight if total_weight > 0 else 0
         
         # Determine signal
-        if composite_score >= 80:
+        if composite_score >= 85:
             signal = "STRONG_BUY"
-        elif composite_score >= 60:
+        elif composite_score >= 68:
             signal = "BUY"
-        elif composite_score >= 40:
+        elif composite_score >= 32:
             signal = "NEUTRAL"
-        elif composite_score >= 20:
+        elif composite_score >= 15:
             signal = "SELL"
         else:
             signal = "STRONG_SELL"
+
+        # Minimum confirmation: at least 3 indicators must agree on direction
+        bullish_indicators = [
+            k for k, v in weighted_scores.items()
+            if v > 50 and k not in ("sentiment",)
+        ]
+        bearish_indicators = [
+            k for k, v in weighted_scores.items()
+            if v < 50 and k not in ("sentiment",)
+        ]
+
+        if signal in ("BUY", "STRONG_BUY") and len(bullish_indicators) < 3:
+            signal = "NEUTRAL"
+            composite_score = 50
+        elif signal in ("SELL", "STRONG_SELL") and len(bearish_indicators) < 3:
+            signal = "NEUTRAL"
+            composite_score = 50
+
+        # In choppy/ranging regimes, only take stronger signals
+        if regime in ("choppy", "ranging") and signal == "BUY":
+            signal = "NEUTRAL"
+            composite_score = 50
+        if regime == "choppy" and signal in ("SELL", "STRONG_SELL"):
+            signal = "NEUTRAL"
+            composite_score = 50
+
+        # Trade WITH the trend in trending regimes
+        if regime in ("trending", "strong_trend"):
+            if indicators.dmp_plus > indicators.dmp_minus:
+                if signal in ("SELL", "STRONG_SELL"):
+                    signal = "NEUTRAL"
+                    composite_score = 50
+            else:
+                if signal in ("BUY", "STRONG_BUY"):
+                    signal = "NEUTRAL"
+                    composite_score = 50
         
         return {
             "composite_score": composite_score,
@@ -636,7 +674,8 @@ class Bot:
             stop_loss=stop_loss,
             signal_score=signal_data["composite_score"],
             phantom_penalty=phantom_penalty,
-            regime=regime
+            regime=regime,
+            atr_14=getattr(indicators, 'atr_14', 0.0)
         )
         
         if size_result.size <= 0:
@@ -776,6 +815,12 @@ Examples:
                                 help="End date (YYYY-MM-DD)")
     backtest_parser.add_argument("--balance", type=float, default=10_000_000,
                                 help="Initial balance in IDR")
+    backtest_parser.add_argument("--output", type=str, default=None,
+                                help="Save backtest results to CSV/JSON (e.g., results.csv)")
+    backtest_parser.add_argument("--stop-loss", type=float, default=0.05,
+                                help="Stop loss percentage (e.g., 0.05 for 5%%)")
+    backtest_parser.add_argument("--take-profit", type=float, default=2.0,
+                                help="Take profit ratio (e.g., 2.0 = 2x stop loss)")
     
     # Paper trading command
     paper_parser = subparsers.add_parser("paper", help="Run paper trading (simulation)")
@@ -785,6 +830,8 @@ Examples:
                              help="Timeframe")
     paper_parser.add_argument("--interval", type=int, default=5,
                              help="Cycle interval in minutes")
+    paper_parser.add_argument("--dry-run", action="store_true", default=True,
+                             help="Dry-run mode (no real orders)")
     
     # Live trading command
     live_parser = subparsers.add_parser("live", help="Run live trading (REAL MONEY - BE CAREFUL!)")
@@ -837,6 +884,18 @@ def main():
             except Exception as e:
                 print(f"Warning: Could not decrypt API keys: {e}")
     
+    # Handle backtest mode
+    if args.command == "backtest":
+        from services.backtester import Backtester
+        config["start_date"] = args.start
+        config["end_date"] = args.end
+        config["output"] = args.output
+        config["stop_loss_pct"] = args.stop_loss
+        config["take_profit_r"] = args.take_profit
+        bt = Backtester(config)
+        results = bt.run()
+        sys.exit(0)
+
     # Initialize bot
     bot = Bot(config)
     

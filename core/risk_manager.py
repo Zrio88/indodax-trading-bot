@@ -199,7 +199,8 @@ class RiskManager:
         stop_loss: float,
         signal_score: float,
         phantom_penalty: float,
-        regime: str
+        regime: str,
+        atr_14: float = 0.0
     ) -> PositionSizeResult:
         """
         Calculate position size using multiple factors
@@ -233,9 +234,29 @@ class RiskManager:
         if stop_loss_pct <= 0:
             return PositionSizeResult(size=0, size_idr=0, risk_per_trade=0, risk_pct=0)
         
-        # 3. Base position size (Half-Kelly)
-        win_prob = 0.6  # Estimated win probability
-        win_loss_ratio = 2.0  # Target win/loss ratio (from TP/SL)
+        # 3. Volatility-adjusted stop loss (widen in high volatility)
+        if atr_14 > 0 and entry_price > 0:
+            atr_pct = atr_14 / entry_price
+            vol_regime = "high" if atr_pct > 0.03 else "normal" if atr_pct > 0.01 else "low"
+            vol_mult = {"high": 0.7, "normal": 1.0, "low": 1.3}.get(vol_regime, 1.0)
+        else:
+            vol_mult = 1.0
+        actual_sl_pct = stop_loss_pct * vol_mult
+        actual_stop_loss = entry_price * (1 - actual_sl_pct) if stop_loss < entry_price else entry_price * (1 + actual_sl_pct)
+        adjusted_stop_loss_pct = abs((entry_price - actual_stop_loss) / entry_price)
+
+        # 4. Dynamic win probability from trade history
+        recent_trades = self.trade_store.recent_trades(self.paper_balance)
+        if recent_trades:
+            wins = [t for t in recent_trades if getattr(t, 'pnl', 0) > 0]
+            win_prob = len(wins) / len(recent_trades) if recent_trades else 0.5
+            # Clamp between 0.3-0.8 to avoid extreme values
+            win_prob = max(0.3, min(0.8, win_prob))
+        else:
+            win_prob = 0.6
+
+        # 5. Base position size (Half-Kelly)
+        win_loss_ratio = 2.0
         kelly_fraction = self.risk_params.get("kelly_fraction", 0.5)
         
         base_size_idr = self.paper_balance * kelly_fraction * (
@@ -265,21 +286,31 @@ class RiskManager:
         # 5. Calculate size in base currency
         size = adjusted_size_idr / entry_price
         
-        # 6. Apply maximum risk per trade limit
+        # 8. Portfolio risk check: sum risk of all open positions
+        open_trades = self.trade_store.open_trades()
+        total_risk = 0.0
+        for t in open_trades:
+            if t.entry_price and t.stop_loss:
+                t_risk_pct = abs((t.entry_price - t.stop_loss) / t.entry_price)
+                total_risk += t.size * t.entry_price * t_risk_pct
+        remaining_risk_capacity = max(0, self.paper_balance * 0.06 - total_risk)
+
+        # 9. Apply maximum risk per trade limit
         max_risk_per_trade = self.paper_balance * 0.02  # 2% max risk
-        max_size_idr = max_risk_per_trade / stop_loss_pct
+        max_risk_per_trade = min(max_risk_per_trade, remaining_risk_capacity)
+        max_size_idr = max_risk_per_trade / adjusted_stop_loss_pct if adjusted_stop_loss_pct > 0 else 0
         max_size = max_size_idr / entry_price
         
         # Take the smaller of the two
         final_size = min(size, max_size)
         
-        # 7. Ensure minimum order size
+        # 10. Ensure minimum order size
         min_order_size = self.config.get("exchange", {}).get("min_order_size", 0.0001)
         if final_size < min_order_size:
             return PositionSizeResult(size=0, size_idr=0, risk_per_trade=0, risk_pct=0)
         
-        # 8. Calculate actual risk
-        risk_per_trade = final_size * entry_price * stop_loss_pct
+        # 11. Calculate actual risk
+        risk_per_trade = final_size * entry_price * adjusted_stop_loss_pct
         risk_pct = (risk_per_trade / self.paper_balance) * 100 if self.paper_balance > 0 else 0
         
         return PositionSizeResult(

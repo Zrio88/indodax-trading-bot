@@ -51,7 +51,8 @@ class TradeStore:
             db_path: Path to SQLite database file
         """
         self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        if db_path != ":memory:":
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self._init_db()
     
     def _init_db(self):
@@ -393,6 +394,44 @@ class TradeStore:
                 else:
                     break
             return streak
+    
+    def recent_trades(self, limit: int = 50) -> List[TradeRecord]:
+        """
+        Get most recent closed trades
+        
+        Args:
+            limit: Maximum number of trades to return
+            
+        Returns:
+            List of recent trade records
+        """
+        trades = []
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM trades
+                WHERE status = 'CLOSED'
+                ORDER BY exit_time DESC
+                LIMIT ?
+            """, (limit,))
+            for row in cursor.fetchall():
+                try:
+                    trades.append(TradeRecord(
+                        id=row["id"], pair=row["pair"],
+                        signal=row["signal"], entry_price=row["entry_price"],
+                        exit_price=row["exit_price"], size=row["size"],
+                        entry_time=datetime.fromisoformat(row["entry_time"]),
+                        exit_time=datetime.fromisoformat(row["exit_time"]) if row["exit_time"] else None,
+                        stop_loss=row["stop_loss"], take_profit=row["take_profit"],
+                        fee=row["fee"], status=row["status"],
+                        regime=row["regime"], phantom_flags=row["phantom_flags"],
+                        notes=row["notes"], pnl=row["pnl"],
+                        pnl_pct=row["pnl_pct"]
+                    ))
+                except Exception:
+                    continue
+        return trades
     
     def total_pnl(self, pair: Optional[str] = None) -> float:
         """
