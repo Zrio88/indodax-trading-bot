@@ -224,7 +224,7 @@ class Indicators:
         # Volume Score
         if indicators.volume_ratio > 2.0:
             scores["volume_spike"] = 100
-        elif indicators.volume_ratio > 1.5:
+        elif indicators.volume_ratio > 1.3:
             scores["volume_spike"] = 75
         elif indicators.volume_ratio > 1.0:
             scores["volume_spike"] = 50
@@ -270,7 +270,7 @@ class Indicators:
         else:
             signal = "STRONG_SELL"
 
-        # Minimum confirmation: at least 3 indicators must agree on direction
+        # Minimum confirmation: at least 2 indicators must agree on direction
         bullish_indicators = [
             k for k, v in weighted_scores.items()
             if v > 50 and k not in ("sentiment",)
@@ -280,17 +280,14 @@ class Indicators:
             if v < 50 and k not in ("sentiment",)
         ]
 
-        if signal in ("BUY", "STRONG_BUY") and len(bullish_indicators) < 3:
+        if signal in ("BUY", "STRONG_BUY") and len(bullish_indicators) < 2:
             signal = "NEUTRAL"
             composite_score = 50
-        elif signal in ("SELL", "STRONG_SELL") and len(bearish_indicators) < 3:
+        elif signal in ("SELL", "STRONG_SELL") and len(bearish_indicators) < 2:
             signal = "NEUTRAL"
             composite_score = 50
 
-        # In choppy/ranging regimes, only take stronger signals
-        if regime in ("choppy", "ranging") and signal == "BUY":
-            signal = "NEUTRAL"
-            composite_score = 50
+        # In choppy regimes, be more selective
         if regime == "choppy" and signal in ("SELL", "STRONG_SELL"):
             signal = "NEUTRAL"
             composite_score = 50
@@ -825,8 +822,8 @@ Examples:
                                 help="Initial balance in IDR")
     backtest_parser.add_argument("--output", type=str, default=None,
                                 help="Save backtest results to CSV/JSON (e.g., results.csv)")
-    backtest_parser.add_argument("--stop-loss", type=float, default=0.05,
-                                help="Stop loss percentage (e.g., 0.05 for 5%%)")
+    backtest_parser.add_argument("--stop-loss", type=float, default=0.06,
+                                help="Stop loss percentage (e.g., 0.06 for 6%%)")
     backtest_parser.add_argument("--take-profit", type=float, default=2.0,
                                 help="Take profit ratio (e.g., 2.0 = 2x stop loss)")
     

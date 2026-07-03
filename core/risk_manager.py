@@ -243,7 +243,7 @@ class RiskManager:
         if atr_14 > 0 and entry_price > 0:
             atr_pct = atr_14 / entry_price
             vol_regime = "high" if atr_pct > 0.03 else "normal" if atr_pct > 0.01 else "low"
-            vol_mult = {"high": 0.7, "normal": 1.0, "low": 1.3}.get(vol_regime, 1.0)
+            vol_mult = {"high": 1.3, "normal": 1.0, "low": 0.7}.get(vol_regime, 1.0)
         else:
             vol_mult = 1.0
         actual_sl_pct = stop_loss_pct * vol_mult
