@@ -67,20 +67,45 @@
 - Volume rendah (142 M), spread tinggi (0.73%)
 - **Rekomendasi:** HINDARI
 
-## Paper Trading — Kondisi Live Saat Ini
+## Paper Trading Test — 2026-07-03
 
-**Semua pair dalam mode NEUTRAL** — tidak ada sinyal BUY/SELL yang aktif:
-- BTC_IDR: ADX 31.78 (trending lemah)
-- ETH_IDR: ADX 49.93 (strong trend, tapi sideways)
-- SOL_IDR: ADX 30.44 (trending lemah)
+**Sesi:** 3 cycle (15m timeframe, SOL_IDR + DOGE_IDR)
 
-Semua komponen berjalan normal:
-- ✅ Live OHLCV fetch dari Indodax
-- ✅ Indicator calculation (ADX, RSI, MACD)
-- ✅ Regime detection
-- ✅ Phantom scan
-- ✅ Risk manager
-- ✅ Graceful shutdown
+**Hasil:** 0 trades — kedua pair dalam regime **choppy** (ADX < 20):
+- SOL_IDR: ADX 19.25 | RSI 39.43 | MACD negatif | Signal NEUTRAL | Phantom 0%
+- DOGE_IDR: ADX 16.21 | RSI 48.29 | MACD positif | Signal NEUTRAL | Phantom 45%
+
+**Verifikasi komponen:**
+- ✅ Live OHLCV fetch dari Indodax (SOL + DOGE)
+- ✅ Indicator calculation (ADX, RSI, MACD) — semua akurat
+- ✅ Regime detection — mendeteksi choppy dengan tepat
+- ✅ Phantom scan — DOGE_IDR terdeteksi 45% phantom
+- ✅ Risk manager — 7 guards lulus
+- ✅ Telegram startup notification — TERKIRIM
+- ✅ Telegram shutdown notification — TERKIRIM
+- ✅ CLI --pairs override config.json — bekerja (SOL+DOGE dimuat)
+- ✅ Graceful shutdown — bersih tanpa error
+
+**Observasi:**
+- Phantom DOGE 45% di cycle 2–3 menunjukkan DOGE memiliki false signal risk tinggi saat sideways
+- Bot TIDAK masuk trade karena regime choppy — ini perilaku yang benar (disiplin)
+- Telegram notification berfungsi penuh (startup + shutdown)
+- Tidak ada error/warning selama berjalan
+
+## Backtest Terbaru — SOL_IDR + DOGE_IDR (2026-05-01 s.d. 2026-07-03)
+
+**Catatan:** Hasil berbeda dari backtest sebelumnya karena perubahan entry strategy di commit `d8ae0ff`.
+
+| Metrik | SOL_IDR | DOGE_IDR | Combined |
+|--------|---------|----------|----------|
+| **Total Trades** | 8 | 11 | 19 |
+| **Win Rate** | 37.5% | 36.4% | 36.8% |
+| **Total Return** | -1.42% | +0.00% | -0.71% |
+| **Profit Factor** | 0.61 | 1.00 | 0.79 |
+| **Max Drawdown** | 2.11% | 2.30% | 1.61% |
+| **Sharpe Ratio** | -3.84 | 0.00 | -1.92 |
+
+**Analisis:** Kinerja menurun setelah tightening entry strategy (commit `d8ae0ff`). Strategy baru lebih jarang entry (dari 23 → 8 trades SOL) tapi tidak lebih akurat. **Perlu evaluasi ulang parameter entry sebelum live.**
 
 ## Risiko Sebelum Live Trading
 
@@ -137,18 +162,26 @@ Dengan 73.9% SOL + 75.0% DOGE win rate, skenario moderat (3%/bln) realistis.
 
 ## Kesimpulan
 
-**BOT SIAP untuk live trading dengan syarat:**
-1. ✅ Backtest 2 bulan profit positif (SOL +8.06%, DOGE +6.06%)
-2. ✅ 73.9% (SOL) / 75.0% (DOGE) win rate
-3. ✅ Max drawdown terkendali (SOL 2.04%, DOGE 0.60%)
-4. ✅ Semua komponen berfungsi di paper mode
-5. ✅ Risk manager dengan 7 guards aktif
-6. ✅ Telegram notification aktif dan terverifikasi
+**⚠️ STATUS: TUNDA LIVE TRADING — Perlu perbaikan entry strategy**
 
-**⚠️ TAPI mulai dengan:**
-- **SOL_IDR utama** — best performer overall
-- **DOGE_IDR opsi diversifikasi** — PF 4.35, max DD 0.60%
-- **HINDARI XRP_IDR, ADA_IDR, LINK_IDR** — rugi di backtest
-- Modal IDR 3–5jt
-- Stop loss harian 5%
-- Review mingguan ketat
+**Yang berfungsi:**
+1. ✅ Semua komponen bot berjalan normal (fetch, indikator, regime, phantom, risk)
+2. ✅ Telegram notification aktif dan terverifikasi (startup + shutdown)
+3. ✅ CLI override config.json berfungsi
+4. ✅ 92/92 tests pass
+
+**Yang bermasalah:**
+1. ❌ **Backtest return turun drastis** setelah tightening entry (SOL +8.06% → -1.42%)
+2. ❌ Win rate turun dari 73.9% → 37.5% (SOL)
+3. ❌ Strategy baru terlalu jarang entry dan tidak lebih akurat
+4. ❌ DOGE_IDR flat 0.00% — tidak ada profit
+
+**Rekomendasi:**
+| # | Tindakan | Prioritas |
+|---|----------|-----------|
+| 1 | **Evaluate ulang entry strategy parameters** — cari keseimbangan frequency vs accuracy | 🔴 WAJIB |
+| 2 | **Kembalikan parameter jika perlu** — commit `d8ae0ff` menurunkan performa | 🔴 WAJIB |
+| 3 | **Running backtest ulang setelah perubahan** — verifikasi WR > 60% sebelum live | 🔴 WAJIB |
+| 4 | **Mulai dengan SOL_IDR** jika backtest kembali positif | 🟡 SETELAH FIX |
+| 5 | **Modal IDR 3–5jt** setelah entry fix | 🟡 SETELAH FIX |
+| 6 | **Stop loss harian 5%** | 🟡 SETELAH FIX |
