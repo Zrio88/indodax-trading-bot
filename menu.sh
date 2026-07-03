@@ -197,7 +197,23 @@ while true; do
       ;;
 
     5)
-      nano .env
+      echo ""
+      if command -v nano &>/dev/null; then
+        EDITOR="nano"
+      elif command -v vim &>/dev/null; then
+        EDITOR="vim"
+      elif command -v vi &>/dev/null; then
+        EDITOR="vi"
+      else
+        echo -e "  ${YELLOW}Ga ada editor teks, install nano dulu...${NC}"
+        if command -v pkg &>/dev/null; then
+          pkg install -y nano 2>/dev/null | tail -1
+        elif command -v apt &>/dev/null; then
+          apt install -y -qq nano 2>/dev/null
+        fi
+        EDITOR="nano"
+      fi
+      $EDITOR .env
       # Re-check env status
       if grep -q "INDODAX_API_KEY=" .env 2>/dev/null && ! grep -q 'INDODAX_API_KEY=""' .env 2>/dev/null; then
         env_ok=1
