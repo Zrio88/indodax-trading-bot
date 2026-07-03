@@ -827,7 +827,11 @@ def main():
         # Decrypt API keys if encrypted
         if os.getenv("INDODAX_API_KEY_ENC"):
             try:
-                manager = SecretManager()
+                enc_key = os.getenv("ENCRYPTION_KEY")
+                if enc_key:
+                    manager = SecretManager(encryption_key=enc_key)
+                else:
+                    manager = SecretManager()
                 config["INDODAX_API_KEY"] = manager.decrypt(os.getenv("INDODAX_API_KEY_ENC"))
                 config["INDODAX_SECRET_KEY"] = manager.decrypt(os.getenv("INDODAX_SECRET_KEY_ENC"))
             except Exception as e:
