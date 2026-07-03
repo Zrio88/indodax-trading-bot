@@ -356,7 +356,7 @@ class Backtester:
                         closes = df["close"].values
                         atr = talib.ATR(highs, lows, closes, timeperiod=14)[-1]
                     except Exception:
-                        pass
+                        atr = 0.0
 
                     exit_signal = self._check_exit(pos, candle, atr, i, pos.entry_candle_idx)
                     if exit_signal:
@@ -392,7 +392,7 @@ class Backtester:
                         candle_idx=i
                     )
                 except Exception as e:
-                    pass
+                    print(f"  ⚠️ Entry scan error for {pair}: {e}")
 
             # Close any remaining open positions at last price
             for pos_pair in list(self.positions.keys()):

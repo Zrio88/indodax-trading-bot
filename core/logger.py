@@ -183,13 +183,19 @@ class Logger:
             "losing_trades": self.losing_trades
         }
         
-        with open("logs/bot.log", "a") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        try:
+            with open("logs/bot.log", "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+        except OSError as e:
+            print(f"Warning: Could not write to log file: {e}")
     
     def log_trade(self, trade_data: Dict[str, Any], action: str = "ENTRY"):
         """Log a trade to file"""
         trade_data["timestamp"] = datetime.utcnow().isoformat()
         trade_data["action"] = action
         
-        with open("logs/trades.log", "a") as f:
-            f.write(json.dumps(trade_data) + "\n")
+        try:
+            with open("logs/trades.log", "a") as f:
+                f.write(json.dumps(trade_data) + "\n")
+        except OSError as e:
+            print(f"Warning: Could not write trade log: {e}")

@@ -428,21 +428,6 @@ class Exchange:
         except Exception as e:
             print(f"Error placing sell order: {e}")
             return {"success": False, "error": str(e)}
-    
-    def limit_sell(self, pair: str, price: float, amount: float):
-        """Place limit sell order"""
-        try:
-            market = self.exchange.markets[pair]
-            price_precision = market["precision"]["price"]
-            amount_precision = market["precision"]["amount"]
-            price = round(price, price_precision)
-            amount = round(amount, amount_precision)
-            
-            order = self.exchange.create_limit_sell_order(pair, amount, price)
-            return {"success": True, "order_id": order["id"]}
-        except Exception as e:
-            print(f"Error placing sell order: {e}")
-            return {"success": False, "error": str(e)}
 
 
 class Bot:
@@ -492,7 +477,7 @@ class Bot:
                 df.set_index('timestamp', inplace=True)
                 df.sort_index(inplace=True)
             return df
-        except:
+        except Exception:
             return None
     
     def initialize(self):
@@ -657,8 +642,8 @@ class Bot:
         is_sell = signal in ["SELL", "STRONG_SELL"]
         
         # Calculate SL/TP
-        stop_loss_pct = self.config["stop_loss_pct"]
-        take_profit_r = self.config["take_profit_r"]
+        stop_loss_pct = self.config.get("stop_loss_pct", 0.02)
+        take_profit_r = self.config.get("take_profit_r", 2.0)
         
         if signal in ["BUY", "STRONG_BUY"]:
             stop_loss = current_price * (1 - stop_loss_pct)

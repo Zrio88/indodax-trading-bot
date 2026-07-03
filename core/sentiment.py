@@ -40,7 +40,7 @@ class Sentiment:
             try:
                 with open(self.CACHE_FILE, "r") as f:
                     return json.load(f)
-            except:
+            except Exception:
                 return {}
         return {}
     

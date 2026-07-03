@@ -124,6 +124,10 @@ class Settings(BaseSettings):
         try:
             with open(config_path, "r") as f:
                 config_data = json.load(f)
+            valid_fields = cls.model_fields.keys()
+            unknown_keys = set(config_data.keys()) - valid_fields
+            if unknown_keys:
+                print(f"Warning: Unknown config keys ignored: {', '.join(sorted(unknown_keys))}")
             return cls(**config_data)
         except FileNotFoundError:
             return cls()

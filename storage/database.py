@@ -425,7 +425,7 @@ class TradeStore:
                         exit_time=datetime.fromisoformat(row["exit_time"]) if row["exit_time"] else None,
                         stop_loss=row["stop_loss"], take_profit=row["take_profit"],
                         fee=row["fee"], status=row["status"],
-                        regime=row["regime"], phantom_flags=row["phantom_flags"],
+                        regime=row["regime"],                         phantom_flags=json.loads(row["phantom_flags"]) if isinstance(row["phantom_flags"], str) else row.get("phantom_flags", {}),
                         notes=row["notes"], pnl=row["pnl"],
                         pnl_pct=row["pnl_pct"]
                     ))

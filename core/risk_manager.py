@@ -106,7 +106,12 @@ class RiskManager:
         # Update trade store
         trade = self.trade_store.get_trade(trade_id)
         if trade:
-            exit_price = trade.entry_price + (pnl / trade.size) if trade.signal == "BUY" else trade.entry_price - (pnl / trade.size)
+            if trade.size == 0:
+                exit_price = trade.entry_price
+            elif trade.signal == "BUY":
+                exit_price = trade.entry_price + (pnl / trade.size)
+            else:
+                exit_price = trade.entry_price - (pnl / trade.size)
             self.trade_store.close_trade(trade_id, exit_price, datetime.utcnow())
     
     def can_trade(self, pair: str = None) -> RiskCheckResult:

@@ -24,3 +24,6 @@ logs/
 .DS_Store
 Thumbs.db
 *.decrypted.*
+encryption_key.txt
+backtest_results/
+

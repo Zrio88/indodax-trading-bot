@@ -67,20 +67,29 @@ def main():
     # Save encryption key
     print()
     print("=" * 60)
-    print("⚠️  IMPORTANT: Simpan encryption key ini dengan aman!")
+    print("⚠️  SECURITY: Simpan encryption key dengan aman! Jangan di-commit!")
     print("=" * 60)
     print()
-    print(f"Encryption Key: {manager.key.decode()}")
-    print()
-    print("Simpan key ini di file 'encryption_key.txt' atau di .env:")
-    print(f"ENCRYPTION_KEY={manager.key.decode()}")
-    print()
     
-    # Ask to save key
-    save_key = input("Simpan encryption key ke file? (y/n): ").strip().lower()
-    if save_key == 'y':
-        manager.save_key("encryption_key.txt")
-        print("✅ Encryption key disimpan ke encryption_key.txt")
+    save_choice = input("Simpan encryption key langsung ke .env? (y/n): ").strip().lower()
+    if save_choice == 'y':
+        try:
+            env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+            with open(env_path, "a") as f:
+                f.write(f'\nENCRYPTION_KEY={manager.key.decode()}\n')
+            print(f"✅ Encryption key ditambahkan ke {env_path}")
+        except Exception as e:
+            print(f"❌ Gagal menyimpan ke .env: {e}")
+    else:
+        save_key = input("Simpan ke file encryption_key.txt? (y/n): ").strip().lower()
+        if save_key == 'y':
+            manager.save_key("encryption_key.txt")
+            print("✅ Encryption key disimpan ke encryption_key.txt")
+        else:
+            print()
+            print("⚠️  Encryption key TIDAK disimpan. Anda harus menambahkannya secara manual ke .env:")
+            print(f"ENCRYPTION_KEY={manager.key.decode()}")
+            print("Perhatikan: key ini akan terlihat di terminal scrollback!")
     
     print()
 
